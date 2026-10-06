@@ -1,5 +1,6 @@
 import unittest
-from sync_master import HEADERS, plan
+from sync_master import HEADERS, plan, projection
+
 
 class SyncSafety(unittest.TestCase):
     def fixture(self):
@@ -19,6 +20,10 @@ class SyncSafety(unittest.TestCase):
         self.assertEqual(changes[0]['values'][0][10], 'id1')
         self.assertNotIn('Berlin', changes[0]['values'][0])
 
+    def test_record_specific_evidence_is_preserved(self):
+        record = self.fixture(); record['evidence'] = 'Direct employer confirms 2027'
+        self.assertEqual(projection('id1', record)[5], 'Direct employer confirms 2027')
+
     def test_changed_headers_stop(self):
         with self.assertRaises(ValueError):
             plan('COLLECTOR_NEW', {}, [['Wrong headers']])
@@ -27,3 +32,7 @@ class SyncSafety(unittest.TestCase):
         row = [''] * 10 + ['id1']
         with self.assertRaises(ValueError):
             plan('COLLECTOR_NEW', {}, [HEADERS, row, row])
+
+
+if __name__ == '__main__':
+    unittest.main()

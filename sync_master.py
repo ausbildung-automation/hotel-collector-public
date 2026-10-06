@@ -19,10 +19,11 @@ HEADERS = [
     'Stable ID',
 ]
 
+
 def projection(key, record):
     stamp = datetime.fromtimestamp(record.get('first_seen', record['last_seen']), timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     status = 'Needs review' if record['status'] == 'NEEDS_REVIEW' else 'Possible match — unconfirmed'
-    evidence = 'Hotelfach is listed; 2027 intake and email acceptance are not verified'
+    evidence = record.get('evidence') or 'Hotelfach is listed; 2027 intake and email acceptance are not verified'
     return [
         record['name'],
         '; '.join(record.get('emails', [])),
@@ -36,6 +37,7 @@ def projection(key, record):
         '',
         record.get('collection_id', key),
     ]
+
 
 def plan(tab, entries, existing):
     """Address rows by immutable ID; never overwrite human columns I/J."""
@@ -60,11 +62,13 @@ def plan(tab, entries, existing):
             next_row += 1
     return changes, next_row - 1
 
+
 def main():
     from google.oauth2 import service_account
     from google.auth.transport.requests import AuthorizedSession
     from github_state import GitHubState
     from collector import validate
+
     config = json.load(open('config.json'))
     state, _ = GitHubState(config['private_repo'], config['state_branch'], os.environ['PRIVATE_COLLECTOR_TOKEN']).read(config['state_path'])
     validate(state)
@@ -73,11 +77,13 @@ def main():
         raise ValueError('Only Google service-account credentials supported')
     session = AuthorizedSession(service_account.Credentials.from_service_account_info(info, scopes=['https://www.googleapis.com/auth/spreadsheets']))
     base = 'https://sheets.googleapis.com/v4/spreadsheets/' + quote(os.environ['GOOGLE_SHEETS_ID'], safe='')
+
     def request(method, route, body=None):
         response = session.request(method, base + route, json=body, timeout=45)
         if not response.ok:
             raise RuntimeError('Sheets request failed; response content suppressed')
         return response.json()
+
     metadata = request('GET', '?fields=sheets.properties')
     sheets = {s['properties']['title']: s['properties'] for s in metadata['sheets']}
     changes, resizes = [], []
@@ -95,6 +101,7 @@ def main():
     for start in range(0, len(changes), 400):
         request('POST', '/values:batchUpdate', {'valueInputOption': 'RAW', 'data': changes[start:start + 400]})
     print(json.dumps({'master_sync': 'success', 'new_candidates': len(state['records']), 'review_candidates': len(state['review_candidates'])}))
+
 
 if __name__ == '__main__':
     try:
