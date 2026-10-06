@@ -1,0 +1,12 @@
+{
+  "public_repo": true,
+  "private_state_initialized": true,
+  "offline_tests": 13,
+  "live_validation": {
+    "run": 37532015311,
+    "parsed_cards": 92,
+    "requests": 2
+  },
+  "production_collection": "awaiting PRIVATE_COLLECTOR_TOKEN and enable flag",
+  "email_sending": "not part of this collector"
+}

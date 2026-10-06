@@ -20,4 +20,5 @@ jobs:
       - name: Test deduplication and courteous request handling
         run: python -m unittest discover -s tests -v
       - name: One live source check with no candidate output
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[live-check]')
         run: python smoke_test.py
