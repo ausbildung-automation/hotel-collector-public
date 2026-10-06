@@ -6,30 +6,23 @@ from urllib.parse import quote
 
 TABS = {'records': 'COLLECTOR_NEW', 'review_candidates': 'COLLECTOR_DUPLICATE_REVIEW'}
 HEADERS = [
-    'المنشأة / Hotel',
-    'الإيميل / Email',
-    'رابط المنشأة / Website',
-    'التخصص / Profession',
-    'حالة الجمع / Collection status',
-    'دليل المصدر / Source evidence',
-    'تاريخ الجمع UTC / Collected UTC',
-    'مصدر الجمع / Source',
-    'قرار المراجعة / Review decision',
-    'ملاحظاتك / Your notes',
-    'معرّف ثابت / Stable ID',
+    'Hotel',
+    'Email',
+    'Website',
+    'Profession',
+    'Collection status',
+    'Source evidence',
+    'Collected UTC',
+    'Source',
+    'Review decision',
+    'Your notes',
+    'Stable ID',
 ]
 
 def projection(key, record):
     stamp = datetime.fromtimestamp(record.get('first_seen', record['last_seen']), timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    status = (
-        'تحتاج مراجعة / Needs review'
-        if record['status'] == 'NEEDS_REVIEW'
-        else 'تطابق محتمل — غير مؤكد / Possible match — unconfirmed'
-    )
-    evidence = (
-        'Hotelfach مذكور؛ سنة 2027 وقبول الإيميل غير متحققين / '
-        'Hotelfach is listed; 2027 intake and email acceptance are not verified'
-    )
+    status = 'Needs review' if record['status'] == 'NEEDS_REVIEW' else 'Possible match — unconfirmed'
+    evidence = 'Hotelfach is listed; 2027 intake and email acceptance are not verified'
     return [
         record['name'],
         '; '.join(record.get('emails', [])),
@@ -39,7 +32,7 @@ def projection(key, record):
         evidence,
         stamp,
         record['source'],
-        'لم تُراجع / Not reviewed',
+        'Not reviewed',
         '',
         record.get('collection_id', key),
     ]
@@ -89,17 +82,16 @@ def main():
     sheets = {s['properties']['title']: s['properties'] for s in metadata['sheets']}
     changes, resizes = [], []
     for section, tab in TABS.items():
-        props = sheets[tab]  # Missing tab stops; never create or select a legacy tab.
+        props = sheets[tab]
         end = props['gridProperties']['rowCount']
         existing = request('GET', '/values/' + quote(f"'{tab}'!A3:K{end}", safe='')).get('values', [])
         planned, needed = plan(tab, state[section], existing)
         changes.extend(planned)
         if needed > end:
             resizes.append({'updateSheetProperties': {'properties': {'sheetId': props['sheetId'], 'gridProperties': {'rowCount': needed + 100}}, 'fields': 'gridProperties.rowCount'}})
-        changes.append({'range': f"'{tab}'!A2", 'values': [['آخر مزامنة UTC / Last sync UTC: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S') + ' — للمراجعة فقط؛ لا إرسال تلقائي / Review only; no automatic sending.']]})
+        changes.append({'range': f"'{tab}'!A2", 'values': [['Last sync UTC: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S') + ' — review only; no automatic sending.']]})
     if resizes:
         request('POST', ':batchUpdate', {'requests': resizes})
-    # RAW keeps scraped strings from executing as formulas.
     for start in range(0, len(changes), 400):
         request('POST', '/values:batchUpdate', {'valueInputOption': 'RAW', 'data': changes[start:start + 400]})
     print(json.dumps({'master_sync': 'success', 'new_candidates': len(state['records']), 'review_candidates': len(state['review_candidates'])}))
