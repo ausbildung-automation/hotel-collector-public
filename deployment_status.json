@@ -15,7 +15,7 @@
       "COLLECTOR_NEW",
       "COLLECTOR_DUPLICATE_REVIEW"
     ],
-    "layout": "11 columns; city omitted from Master; Arabic/English display labels",
+    "layout": "11 columns; city omitted from Master; English-only display labels and information",
     "code_and_sheet_schema_aligned": true,
     "authentication": "awaiting GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON secret",
     "last_check": "MASTER_LINK_SKIPPED_NO_SERVICE_ACCOUNT"
