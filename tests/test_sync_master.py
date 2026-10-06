@@ -7,7 +7,7 @@ class SyncSafety(unittest.TestCase):
 
     def test_preserves_manual_decisions_when_rows_sorted(self):
         row = [''] * 11
-        row[8:11] = ['عرض 2027 مؤكد / 2027 offer confirmed', 'Keep my note', 'id1']
+        row[8:11] = ['2027 offer confirmed', 'Keep my note', 'id1']
         changes, _ = plan('COLLECTOR_NEW', {'id1': self.fixture()}, [HEADERS, [''] * 10 + ['id2'], row])
         self.assertEqual(changes[0]['range'], "'COLLECTOR_NEW'!A5:H5")
         self.assertEqual(len(changes[0]['values'][0]), 8)
