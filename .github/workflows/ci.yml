@@ -1,0 +1,23 @@
+name: Collector Validation
+on:
+  push:
+    branches: [main]
+    paths: ['*.py', 'tests/**', 'config.json', '.github/workflows/ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test deduplication and courteous request handling
+        run: python -m unittest discover -s tests -v
+      - name: One live source check with no candidate output
+        run: python smoke_test.py

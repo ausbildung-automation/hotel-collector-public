@@ -1,0 +1,28 @@
+name: Courteous Hotel Collection
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 */6 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: hotel-collection-private-state
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: vars.COLLECTOR_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PRIVATE_COLLECTOR_TOKEN: ${{ secrets.PRIVATE_COLLECTOR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check code without contacting websites
+        run: python -m unittest discover -s tests
+      - name: Collect and checkpoint only to private state
+        run: python collector.py --remote --persist

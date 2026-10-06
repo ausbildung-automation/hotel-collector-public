@@ -1,0 +1,8 @@
+{
+  "private_repo": "ausbildung-automation/hotel-email-sender",
+  "state_branch": "hotel-collection-state",
+  "state_path": "state/collection_registry.json",
+  "max_new_per_run": 20,
+  "max_requests_per_run": 12,
+  "sources": [{"url":"https://www.dehoga-bayern.de/gastgeber-der-zukunft/","adapter":"dehoga_h3"}]
+}
