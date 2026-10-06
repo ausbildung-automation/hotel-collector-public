@@ -1,9 +1,6 @@
 name: Courteous Hotel Collection
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['.collector-run-now']
   schedule:
     - cron: '47 */3 * * *'
 permissions:
