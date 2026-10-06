@@ -5,32 +5,65 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 TABS = {'records': 'COLLECTOR_NEW', 'review_candidates': 'COLLECTOR_DUPLICATE_REVIEW'}
-HEADERS = ['المنشأة', 'المدينة', 'الإيميل', 'رابط المنشأة', 'التخصص', 'حالة الجمع', 'دليل المصدر', 'تاريخ الجمع UTC', 'مصدر الجمع', 'قرار المراجعة', 'ملاحظاتك', 'معرّف ثابت']
+HEADERS = [
+    'المنشأة / Hotel',
+    'الإيميل / Email',
+    'رابط المنشأة / Website',
+    'التخصص / Profession',
+    'حالة الجمع / Collection status',
+    'دليل المصدر / Source evidence',
+    'تاريخ الجمع UTC / Collected UTC',
+    'مصدر الجمع / Source',
+    'قرار المراجعة / Review decision',
+    'ملاحظاتك / Your notes',
+    'معرّف ثابت / Stable ID',
+]
 
 def projection(key, record):
     stamp = datetime.fromtimestamp(record.get('first_seen', record['last_seen']), timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    return [record['name'], record.get('city', ''), '; '.join(record.get('emails', [])), record.get('website', ''), record.get('profession', ''), 'تحتاج مراجعة' if record['status'] == 'NEEDS_REVIEW' else 'تطابق محتمل — غير مؤكد', 'Hotelfach مذكور؛ سنة 2027 وقبول الإيميل غير متحققين', stamp, record['source'], 'لم تُراجع', '', record.get('collection_id', key)]
+    status = (
+        'تحتاج مراجعة / Needs review'
+        if record['status'] == 'NEEDS_REVIEW'
+        else 'تطابق محتمل — غير مؤكد / Possible match — unconfirmed'
+    )
+    evidence = (
+        'Hotelfach مذكور؛ سنة 2027 وقبول الإيميل غير متحققين / '
+        'Hotelfach is listed; 2027 intake and email acceptance are not verified'
+    )
+    return [
+        record['name'],
+        '; '.join(record.get('emails', [])),
+        record.get('website', ''),
+        record.get('profession', ''),
+        status,
+        evidence,
+        stamp,
+        record['source'],
+        'لم تُراجع / Not reviewed',
+        '',
+        record.get('collection_id', key),
+    ]
 
 def plan(tab, entries, existing):
-    """Address rows by immutable ID; never overwrite human columns J/K."""
+    """Address rows by immutable ID; never overwrite human columns I/J."""
     if not existing or existing[0] != HEADERS:
         raise ValueError('Master tab headers changed; stop rather than overwrite')
     positions = {}
     for rownum, row in enumerate(existing[1:], 4):
         if not any(row):
             continue
-        if len(row) < 12 or not row[11] or row[11] in positions:
+        if len(row) < 11 or not row[10] or row[10] in positions:
             raise ValueError('Missing or duplicate row identity; manual review needed')
-        positions[row[11]] = rownum
+        positions[row[10]] = rownum
     next_row = len(existing) + 3
     changes = []
     for key, record in entries.items():
         row = projection(key, record)
-        if row[11] in positions:
-            n = positions[row[11]]
-            changes.append({'range': f"'{tab}'!A{n}:I{n}", 'values': [row[:9]]})
+        if row[10] in positions:
+            n = positions[row[10]]
+            changes.append({'range': f"'{tab}'!A{n}:H{n}", 'values': [row[:8]]})
         else:
-            changes.append({'range': f"'{tab}'!A{next_row}:L{next_row}", 'values': [row]})
+            changes.append({'range': f"'{tab}'!A{next_row}:K{next_row}", 'values': [row]})
             next_row += 1
     return changes, next_row - 1
 
@@ -58,12 +91,12 @@ def main():
     for section, tab in TABS.items():
         props = sheets[tab]  # Missing tab stops; never create or select a legacy tab.
         end = props['gridProperties']['rowCount']
-        existing = request('GET', '/values/' + quote(f"'{tab}'!A3:L{end}", safe='')) .get('values', [])
+        existing = request('GET', '/values/' + quote(f"'{tab}'!A3:K{end}", safe='')).get('values', [])
         planned, needed = plan(tab, state[section], existing)
         changes.extend(planned)
         if needed > end:
             resizes.append({'updateSheetProperties': {'properties': {'sheetId': props['sheetId'], 'gridProperties': {'rowCount': needed + 100}}, 'fields': 'gridProperties.rowCount'}})
-        changes.append({'range': f"'{tab}'!A2", 'values': [['آخر مزامنة UTC: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S') + ' — للمراجعة فقط؛ لا إرسال تلقائي.']]})
+        changes.append({'range': f"'{tab}'!A2", 'values': [['آخر مزامنة UTC / Last sync UTC: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S') + ' — للمراجعة فقط؛ لا إرسال تلقائي / Review only; no automatic sending.']]})
     if resizes:
         request('POST', ':batchUpdate', {'requests': resizes})
     # RAW keeps scraped strings from executing as formulas.
