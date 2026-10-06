@@ -1,12 +1,24 @@
 {
   "public_repo": true,
   "private_state_initialized": true,
-  "offline_tests": 13,
+  "offline_tests": 17,
   "live_validation": {
-    "run": 37532015311,
+    "collection_run": 37534378627,
     "parsed_cards": 92,
-    "requests": 2
+    "requests": 2,
+    "master_link_check_run": 37537941567
   },
-  "production_collection": "awaiting PRIVATE_COLLECTOR_TOKEN and enable flag",
+  "production_collection": "enabled; first production collection succeeded on 2026-10-06",
+  "master_sheet": {
+    "spreadsheet_id": "1qBViUSJvnnkagG_2XPlxSgeHQOJA4MDm0_gFKitrxcI",
+    "tabs": [
+      "COLLECTOR_NEW",
+      "COLLECTOR_DUPLICATE_REVIEW"
+    ],
+    "layout": "11 columns; city omitted from Master; Arabic/English display labels",
+    "code_and_sheet_schema_aligned": true,
+    "authentication": "awaiting GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON secret",
+    "last_check": "MASTER_LINK_SKIPPED_NO_SERVICE_ACCOUNT"
+  },
   "email_sending": "not part of this collector"
 }
