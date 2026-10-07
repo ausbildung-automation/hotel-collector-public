@@ -3,7 +3,7 @@
   "state_branch": "main",
   "state_path": "state/collection_registry.json",
   "max_new_per_run": 100,
-  "max_requests_per_run": 28,
+  "max_requests_per_run": 120,
   "max_requests_per_host_per_run": 4,
   "max_processed_per_run": 4000,
   "max_pending": 5000,
@@ -13,110 +13,151 @@
       "adapter": "single_opportunity",
       "name": "Hotel Speidel's BrauManufaktur",
       "city": "Hohenstein",
-      "emails": ["christina.speidel@speidels-brauereile.de"],
-      "required_phrases": ["HOTELFACHMANN", "2027"],
+      "required_phrases": [
+        "HOTELFACHMANN",
+        "2027"
+      ],
       "evidence": "Direct employer training page offers Hotelfach training and includes 2027 as a selectable start year",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://ochsen-hoefen.de/karriere/",
       "adapter": "single_opportunity",
       "name": "Hotel Ochsen Höfen",
       "city": "Höfen / Enz",
-      "emails": ["info@ochsen-hoefen.de"],
-      "required_phrases": ["Ausbildung", "Hotelfachfrau", "Hotelfachmann"],
+      "required_phrases": [
+        "Ausbildung",
+        "Hotelfachfrau",
+        "Hotelfachmann"
+      ],
       "evidence": "Direct employer career page currently advertises Hotelfach training; 2027 intake date requires review",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://karriere.budersand.de/jobposting/76438916bcc2eec5edaa55a7c6a9a28802d870730",
       "adapter": "single_opportunity",
       "name": "BUDERSAND Hotel - Golf & Spa - Sylt",
       "city": "Hörnum (Sylt)",
-      "emails": ["career@budersand.de"],
-      "required_phrases": ["Ausbildung Hotelfachmann/-frau", "2027"],
+      "required_phrases": [
+        "Ausbildung Hotelfachmann/-frau",
+        "2027"
+      ],
       "evidence": "Direct employer job page advertises Hotelfachmann/-frau Ausbildung starting in 2027",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://joboffers.lanserhof.com/Auszubildende-im-Hotelfach-all-genders-de-j104.html",
       "adapter": "single_opportunity",
       "name": "Lanserhof Tegernsee",
       "city": "Waakirchen",
-      "emails": ["academy.tegernsee@lanserhof.com"],
-      "required_phrases": ["Auszubildende im Hotelfach"],
+      "required_phrases": [
+        "Auszubildende im Hotelfach"
+      ],
       "evidence": "Direct employer job page currently advertises a three-year Hotelfach training position; intake date requires review",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://westeroog.de/",
       "adapter": "single_opportunity",
       "name": "Westeroog",
-      "emails": ["bewerbung@westeroog.de"],
-      "required_phrases": ["Auszubildende/r Hotelfach"],
+      "required_phrases": [
+        "Auszubildende/r Hotelfach"
+      ],
       "evidence": "Direct employer homepage currently advertises an Auszubildende/r Hotelfach position; intake date requires review",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://www.siebenquell.com/hotel/jobs/ausbildung-hotelfach/",
       "adapter": "single_opportunity",
       "name": "Siebenquell GesundZeitResort",
       "city": "Weißenstadt",
-      "emails": ["bewerbung@siebenquell.com"],
-      "required_phrases": ["Ausbildung zur Hotelfachfrau / zum Hotelfachmann", "2027"],
+      "required_phrases": [
+        "Ausbildung zur Hotelfachfrau / zum Hotelfachmann",
+        "2027"
+      ],
       "evidence": "Direct employer job page advertises Hotelfach training starting in August or September 2027",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://hotel-karpfen.com/karriere/",
       "adapter": "single_opportunity",
       "name": "Hotel Karpfen Eberbach",
       "city": "Eberbach",
-      "emails": ["kontakt@hotel-karpfen.com"],
-      "required_phrases": ["Ausbildung", "Hotelfachmann", "Hotelfachfrau"],
+      "required_phrases": [
+        "Ausbildung",
+        "Hotelfachmann",
+        "Hotelfachfrau"
+      ],
       "evidence": "Direct employer career page currently advertises Hotelfach training; 2027 intake date requires review",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://hotel-heinz.de/ausbildung/",
       "adapter": "single_opportunity",
       "name": "Hotel Heinz",
       "city": "Höhr-Grenzhausen",
-      "emails": ["info@hotel-heinz.de"],
-      "required_phrases": ["Hotelfachmann/-frau", "Ausbildung"],
+      "required_phrases": [
+        "Hotelfachmann/-frau",
+        "Ausbildung"
+      ],
       "evidence": "Direct employer training page currently advertises Hotelfach training; 2027 intake date requires review",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://www.fuchsbraeu.de/ueber-den-fuchs/ausbildung/",
       "adapter": "single_opportunity",
       "name": "Fuchsbräu Hotel GmbH",
       "city": "Beilngries",
-      "emails": [],
-      "required_phrases": ["Hotelfachleute", "Ausbildung"],
+      "required_phrases": [
+        "Hotelfachleute",
+        "Ausbildung"
+      ],
       "evidence": "Direct employer training page currently advertises Hotelfach training; 2027 intake and application email require review",
       "priority": 10,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "employer"
     },
     {
       "url": "https://www.ausbildungskompass.de/berufecheck/beruf/hotelfachmann-frau",
       "adapter": "ausbildungskompass",
       "priority": 20,
-      "refresh_hours": 24
+      "refresh_hours": 24,
+      "family": "regional_portal"
     },
     {
       "url": "https://www.dehoga-bayern.de/gastgeber-der-zukunft/",
       "adapter": "dehoga_h3",
       "priority": 30,
-      "refresh_hours": 48
+      "refresh_hours": 48,
+      "family": "association"
     }
+  ],
+  "network_runtime_seconds": 3000,
+  "pages_per_hotel": 4,
+  "search_queries_per_run": 2,
+  "discovery_pages_per_run": 12,
+  "discovery_families": [
+    "employer",
+    "association",
+    "chamber",
+    "hospitality_portal",
+    "regional_portal",
+    "public_employment"
   ]
 }

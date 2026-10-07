@@ -16,6 +16,10 @@ def main():
     parser.add_argument('--persist', action='store_true')
     parser.add_argument('--remote', action='store_true')
     args = parser.parse_args()
+    if args.remote:
+        if not args.persist: raise ValueError('Remote run must persist')
+        from production import main as production_main
+        return production_main()
     config = json.loads(Path(args.config).read_text())
     backend = None
     if args.remote:

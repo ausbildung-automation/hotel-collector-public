@@ -344,6 +344,8 @@ def run(args):
     save_state(gh,state,state_sha);print(json.dumps(state["last_summary"],ensure_ascii=False));return 0
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument("--sheets",nargs="+",default=DEFAULT_SHEETS);p.add_argument("--max-rows",type=int,default=int(os.environ.get("ENRICH_MAX_ROWS","20")));p.add_argument("--max-seconds",type=int,default=int(os.environ.get("ENRICH_MAX_SECONDS","900")));p.add_argument("--max-pages-per-hotel",type=int,default=int(os.environ.get("ENRICH_MAX_PAGES","7")));p.add_argument("--max-requests-per-host",type=int,default=int(os.environ.get("ENRICH_MAX_HOST_REQUESTS","5")));p.add_argument("--delay",type=float,default=float(os.environ.get("ENRICH_DELAY","1.0")));p.add_argument("--timeout",type=int,default=int(os.environ.get("ENRICH_TIMEOUT","15")));p.add_argument("--cooldown-hours",type=int,default=int(os.environ.get("ENRICH_COOLDOWN_HOURS","168")));p.add_argument("--apply",action="store_true");p.add_argument("--include-finalized",action="store_true");p.add_argument("--force",action="store_true");return run(p.parse_args())
+    # Legacy unsafe crawler/writer is retired. All production work shares one pipeline.
+    from production import main as production_main
+    return production_main()
 
 if __name__=="__main__":raise SystemExit(main())

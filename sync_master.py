@@ -27,56 +27,15 @@ def _stamp(r): return float(r.get('first_seen',r.get('last_seen',0)) or 0)
 def _score(r): return 6*len(r.get('emails',[]) or [])+5*bool(r.get('website'))+2*bool(r.get('evidence'))
 
 def merge_entries(state):
-    items=[]
-    for section in ('records','review_candidates'):
-        for key,record in state.get(section,{}).items():items.append({'key':key,'record':record,'section':section})
-    parent=list(range(len(items)))
-    def find(i):
-        while parent[i]!=i:
-            parent[i]=parent[parent[i]];i=parent[i]
-        return i
-    def union(i,j):
-        i,j=find(i),find(j)
-        if i!=j:parent[j]=i
-    buckets={}
-    for i,item in enumerate(items):
-        n=_norm_name(item['record'].get('name'))
-        for token in set(_distinctive(n)):
-            for j in buckets.get(token,[]):
-                if _same_hotel(item['record'].get('name'),items[j]['record'].get('name')):union(i,j)
-            buckets.setdefault(token,[]).append(i)
-    groups={}
-    for i,item in enumerate(items):groups.setdefault(find(i),[]).append(item)
-    out={}
-    for members in groups.values():
-        ordered=sorted(members,key=lambda x:(_stamp(x['record']),str(x['key'])))
-        canonical=ordered[0]
-        richest=max(members,key=lambda x:(_score(x['record']),len(str(x['record'].get('name','')))))
-        record=copy.deepcopy(richest['record'])
-        emails=[];evidence=[];sources=[]
-        for item in members:
-            src=item['record']
-            for email in src.get('emails',[]) or []:
-                if email and email not in emails:emails.append(email)
-            ev=str(src.get('evidence') or '').strip();so=str(src.get('source') or '').strip()
-            if ev and ev not in evidence:evidence.append(ev)
-            if so and so not in sources:sources.append(so)
-        record['emails']=emails
-        if not record.get('website'):record['website']=next((x['record'].get('website') for x in members if x['record'].get('website')),'')
-        if not record.get('profession'):record['profession']=next((x['record'].get('profession') for x in members if x['record'].get('profession')),'')
-        if evidence:record['evidence']=' | '.join(evidence)
-        if sources:record['source']='; '.join(sources)
-        first=[x['record'].get('first_seen') for x in members if x['record'].get('first_seen') is not None]
-        last=[x['record'].get('last_seen') for x in members if x['record'].get('last_seen') is not None]
-        if first:record['first_seen']=min(first)
-        if last:record['last_seen']=max(last)
-        record['status']='NEEDS_REVIEW' if any(x['section']=='records' or x['record'].get('status')=='NEEDS_REVIEW' for x in members) else 'POSSIBLE_MATCH'
-        cid=canonical['record'].get('collection_id',canonical['key'])
-        record['collection_id']=cid
-        record['_aliases']=sorted({x['record'].get('collection_id',x['key']) for x in members})
-        if cid in out:raise ValueError('Canonical collector identity collision')
-        out[cid]=record
-    return out
+    from identity import canonicalize
+    from verification import publishable
+    result={}
+    for cid, record in canonicalize(state).items():
+        if publishable(record):
+            record=copy.deepcopy(record)
+            record['_aliases']=record.get('aliases',[cid])
+            result[cid]=record
+    return result
 
 def projection(key,record):
     ts=datetime.fromtimestamp(record.get('first_seen',record['last_seen']),timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
@@ -125,34 +84,8 @@ def compose_rows(entries,existing):
     return rows
 
 def main():
-    from google.oauth2 import service_account
-    from google.auth.transport.requests import AuthorizedSession
-    from github_state import GitHubState
-    from collector import validate
-    config=json.load(open('config.json'))
-    state,_=GitHubState(config['private_repo'],config['state_branch'],os.environ['PRIVATE_COLLECTOR_TOKEN']).read(config['state_path'])
-    validate(state)
-    info=json.loads(os.environ['GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON'])
-    if info.get('type')!='service_account' or info.get('token_uri')!='https://oauth2.googleapis.com/token':raise ValueError('Only Google service-account credentials supported')
-    session=AuthorizedSession(service_account.Credentials.from_service_account_info(info,scopes=['https://www.googleapis.com/auth/spreadsheets']))
-    base='https://sheets.googleapis.com/v4/spreadsheets/'+quote(os.environ['GOOGLE_SHEETS_ID'],safe='')
-    def request(method,route,body=None):
-        response=session.request(method,base+route,json=body,timeout=45)
-        if not response.ok:raise RuntimeError('Sheets request failed; response content suppressed')
-        return response.json()
-    metadata=request('GET','?fields=sheets.properties');sheets={s['properties']['title']:s['properties'] for s in metadata['sheets']}
-    if TAB not in sheets:raise ValueError('Single collector tab missing')
-    props=sheets[TAB];end=props['gridProperties']['rowCount']
-    existing=request('GET','/values/'+quote(f"'{TAB}'!A3:K{end}",safe='')).get('values',[])
-    rows=compose_rows(merge_entries(state),existing);needed=len(rows)+3
-    if needed>end:
-        request('POST',':batchUpdate',{'requests':[{'updateSheetProperties':{'properties':{'sheetId':props['sheetId'],'gridProperties':{'rowCount':needed+100}},'fields':'gridProperties.rowCount'}}]});end=needed+100
-    request('POST','/values/'+quote(f"'{TAB}'!A4:K{end}",safe='')+':clear',{})
-    now=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    changes=[{'range':f"'{TAB}'!A1",'values':[['Hotel collection results — deduplicated — single collector page']]},{'range':f"'{TAB}'!A2",'values':[[f'Last sync UTC: {now} — review only; no automatic sending.']]}]
-    if rows:changes.append({'range':f"'{TAB}'!A4:K{len(rows)+3}",'values':rows})
-    request('POST','/values:batchUpdate',{'valueInputOption':'RAW','data':changes})
-    print(json.dumps({'master_sync':'success','collector_rows':len(rows)}))
+    from production import main as production_main
+    return production_main(sync_only=True)
 
 if __name__=='__main__':
     try:main()

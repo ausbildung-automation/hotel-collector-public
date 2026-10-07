@@ -48,7 +48,8 @@ class DirectoryParser(HTMLParser):
         cards = self.cards + ([self.card] if self.card else [])
         for card in cards:
             text = ' '.join(card['text'])
-            if not re.search(r'Hotelfach(?:frau|mann|leute)', text, re.I):
+            from verification import professions
+            if not re.search(r'Hotelfach(?:frau|mann|leute)', text, re.I) and not professions(text):
                 continue
             websites = []
             for href, label in card['links']:
@@ -74,7 +75,7 @@ class DirectoryParser(HTMLParser):
                 'emails': sorted(set(emails)),
                 'source': source,
                 'evidence': 'Directory lists Hotelfach training; current intake and email acceptance require review',
-                'profession': 'Hotelfachmann/-frau',
+                'profession': '; '.join(__import__('verification').professions(text)) or 'Hotelfachmann/-frau',
                 'last_seen': time.time(),
             }
 
@@ -116,9 +117,8 @@ def direct_leads(source, html):
     excluded = source.get('excluded_phrases', [])
     if any(' '.join(str(phrase).split()).casefold() in folded for phrase in excluded):
         raise SourceError('EXCLUDED_TEXT_PRESENT')
-    emails = [str(e).strip().lower() for e in source.get('emails', []) if EMAIL.fullmatch(str(e).strip())]
-    if not emails and source.get('allow_page_emails'):
-        emails = sorted(set(EMAIL.findall(text)))
+    # Configured addresses are hints only: exact publication on this page is mandatory.
+    emails = sorted(set(e.lower() for e in EMAIL.findall(text)))
     evidence = source.get('evidence') or 'Direct employer page advertises Hotelfach training; intake date requires review'
     yield {
         'name': source['name'],
@@ -127,7 +127,7 @@ def direct_leads(source, html):
         'emails': emails,
         'source': source['url'],
         'evidence': evidence,
-        'profession': 'Hotelfachmann/-frau',
+        'profession': '; '.join(__import__('verification').professions(text)) or 'Hotelfachmann/-frau',
         'last_seen': time.time(),
     }
 

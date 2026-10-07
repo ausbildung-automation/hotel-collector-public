@@ -1,3 +1,5 @@
+import ipaddress
+import socket
 import random
 import re
 import time
@@ -10,7 +12,7 @@ class NoRedirect(request.HTTPRedirectHandler):
 
 
 class CourteousHTTP:
-    def __init__(self, state, allowed_hosts, opener=None, clock=time.time, sleeper=time.sleep, rng=random.uniform, max_requests=28, max_requests_per_host=4):
+    def __init__(self, state, allowed_hosts, opener=None, clock=time.time, sleeper=time.sleep, rng=random.uniform, max_requests=28, max_requests_per_host=4, deadline=None, check_dns=True):
         self.state = state
         self.allowed = set(allowed_hosts)
         self.opener = opener or request.build_opener(NoRedirect()).open
@@ -21,6 +23,11 @@ class CourteousHTTP:
         self.max_requests = max_requests
         self.max_requests_per_host = max_requests_per_host
         self.host_requests = {}
+        self.deadline = deadline
+        self.check_dns = check_dns and opener is None
+        self.resolved_hosts = set()
+        self.redirects = {}
+        self.cache = {}
 
     def host(self, url):
         canonical(url)
@@ -49,7 +56,7 @@ class CourteousHTTP:
         s['until'] = self.clock() + seconds
         s['last_status'] = status
 
-    def raw(self, url, headers=None):
+    def reserve(self, url):
         host = self.host(url)
         s = self.state['hosts'].setdefault(host, {})
         if s.get('until', 0) > self.clock():
@@ -58,15 +65,32 @@ class CourteousHTTP:
             raise Deferred('RUN_REQUEST_LIMIT')
         if self.host_requests.get(host, 0) >= self.max_requests_per_host:
             raise Deferred('HOST_REQUEST_LIMIT')
+        if self.deadline is not None and self.clock() + 30 >= self.deadline:
+            raise Deferred('RUNTIME_LIMIT')
         delay = max(15, s.get('delay', 15)) + self.rng(0, 10)
         remaining = s.get('last_request', 0) + delay - self.clock()
         if remaining > 60:
             raise Deferred('LONG_CRAWL_DELAY')
+        if self.deadline is not None and self.clock() + max(0, remaining) + 30 >= self.deadline:
+            raise Deferred('RUNTIME_LIMIT')
         if remaining > 0:
             self.sleep(remaining)
         self.requests += 1
         self.host_requests[host] = self.host_requests.get(host, 0) + 1
         s['last_request'] = self.clock()
+
+    def raw(self, url, headers=None):
+        host = self.host(url)
+        if self.check_dns and host not in self.resolved_hosts:
+            try:
+                addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+            except OSError:
+                self.pause(url, 0)
+                raise Deferred('DNS_FAILURE') from None
+            if not addresses or any(not ipaddress.ip_address(a[4][0]).is_global for a in addresses):
+                raise Deferred('NON_PUBLIC_HOST')
+            self.resolved_hosts.add(host)
+        self.reserve(url)
         try:
             req = request.Request(url, headers={'User-Agent': BOT, 'Accept': 'text/html,text/plain;q=0.9', **(headers or {})})
             with self.opener(req, timeout=25) as response:
@@ -75,7 +99,7 @@ class CourteousHTTP:
                     raise Deferred('PAGE_TOO_LARGE')
                 return body, response.headers
         except error.HTTPError as exc:
-            if exc.code in (304, 404, 410):
+            if exc.code in (301, 302, 303, 307, 308, 304, 404, 410):
                 raise
             self.pause(url, exc.code, exc.headers)
             raise Deferred('HTTP_' + str(exc.code)) from None
@@ -89,7 +113,19 @@ class CourteousHTTP:
         if s.get('robots_until', 0) <= self.clock():
             robots_url = parse.urlunsplit(('https', host, '/robots.txt', '', ''))
             try:
-                body, _ = self.raw(robots_url)
+                for redirect in range(4):
+                    try:
+                        body, _ = self.raw(robots_url)
+                        break
+                    except error.HTTPError as move:
+                        if move.code not in (301, 302, 303, 307, 308):raise
+                        target = parse.urljoin(robots_url, move.headers.get('Location', ''))
+                        canonical(target)
+                        new_host = parse.urlsplit(target).hostname
+                        if redirect == 3 or new_host.removeprefix('www.') != host.removeprefix('www.'):
+                            raise Deferred('ROBOTS_REDIRECT_REVIEW') from None
+                        self.allowed.add(new_host)
+                        robots_url = target
             except error.HTTPError as exc:
                 if exc.code in (404, 410):
                     body = b'User-agent: *\nDisallow:\n'
@@ -104,7 +140,7 @@ class CourteousHTTP:
         rate = rp.request_rate(BOT)
         s['delay'] = max(15, rp.crawl_delay(BOT) or 0, rate.seconds / rate.requests if rate and rate.requests else 0)
 
-    def get(self, url, refresh_hours=72):
+    def get(self, url, refresh_hours=72, redirects=0):
         self.robots(url)
         page = self.state['pages'].setdefault(url, {})
         if page.get('checked_at') and page['checked_at'] + max(1, refresh_hours) * 3600 > self.clock():
@@ -117,6 +153,15 @@ class CourteousHTTP:
         try:
             body, received = self.raw(url, headers)
         except error.HTTPError as exc:
+            if exc.code in (301, 302, 303, 307, 308):
+                target = parse.urljoin(url, exc.headers.get('Location', ''))
+                canonical(target)
+                old, new = parse.urlsplit(url).hostname, parse.urlsplit(target).hostname
+                if redirects >= 3 or old.removeprefix('www.') != new.removeprefix('www.'):
+                    raise Deferred('REDIRECT_REVIEW') from None
+                self.allowed.add(new)
+                self.redirects[url] = target
+                return self.get(target, refresh_hours, redirects + 1)
             page['checked_at'] = self.clock()
             if exc.code == 304:
                 raise Deferred('UNCHANGED') from None
@@ -129,6 +174,7 @@ class CourteousHTTP:
             raise Deferred('NON_HTML')
         page.update(checked_at=self.clock(), etag=received.get('ETag', ''), modified=received.get('Last-Modified', ''))
         self.state['hosts'][self.host(url)]['failures'] = 0
+        self.cache[url] = text
         return text
 
 

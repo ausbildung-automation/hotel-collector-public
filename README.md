@@ -1,58 +1,37 @@
-# Hotel Directory Collector
+# Hotel Ausbildung collector — production v3
 
-مستودع Public مستقل لجمع الفنادق تدريجياً. لا يحتوي وظيفة إرسال بريد، ولا صوراً أو سيفي أو سجل المستخدم.
+Collection only: no application delivery, SMTP, or sender repository writes.
 
-## السلوك
+## Operation
 
-- مصدر أول: دليل DEHOGA Bayern الرسمي. يجمع الفنادق التي يذكر دليلها تدريب Hotelfachmann/-frau؛ لا يستنتج وجود مقعد 2027 أو قبول تقديم بالإيميل.
-- طلب واحد في كل مرة، بفاصل 15–25 ثانية على الأقل. احترام `robots.txt` و`Crawl-delay` و`Request-rate`.
-- سقف 12 طلباً و20 فندقاً جديداً للدورة؛ طلب robots يدخل ضمن السقف. نتائج الدليل المتبقية تتحول إلى طابور محفوظ وتستكمل دون إعادة تحميل الصفحة.
-- لا إعادة محاولة مباشرة عند 429 أو 403 أو أخطاء الاتصال. توقيف مستمر عبر الدورات، يبدأ من 15 دقيقة ويتزايد؛ 403 وتحدي CAPTCHA يوقفان الموقع يوماً على الأقل. يحترم Retry-After حتى إذا طلب الموقع مدة أطول.
-- الصفحة لا يعاد فحصها قبل 72 ساعة، مع ETag وLast-Modified إذا توفرا. تعذر قراءة robots يوقف ذلك المصدر. التحويلات لا تتبع تلقائياً؛ يجب تصحيح رابط المصدر المعتمد.
-- هوية User-Agent ثابتة وواضحة؛ لا تغيير IP، ولا تقليد متصفح، ولا تجاوز CAPTCHA.
-- لا ادعاء ضمان عدم الحظر. يعتمد النجاح على سماح المصدر وثبات بنية الصفحة؛ تغير البنية يدخل للمراجعة.
+The existing external scheduler dispatches `external-cron` to the main collection workflow. No GitHub cron or ChatGPT automation is configured. `.collector-run-now` is an explicit operator smoke-cycle trigger, not a scheduler. A manual compatibility workflow uses the same pipeline and concurrency group.
 
-## منع التكرار
+The workflow allows 60 minutes; network work stops after 50 minutes, reserving time for checkpoints and Sheet synchronization. Normal maximum: **120 HTTP requests**, including robots, API searches, and redirects; **4 per host**. Requests are sequential, with robots/crawl-delay/request-rate compliance, a 15–25 second minimum host interval, persistent exponential cooldown, Retry-After and CAPTCHA stop. No proxies or restriction evasion. DNS/private-network checks and bounded redirects protect discovered URLs.
 
-السجل الخاص `state/collection_registry.json` في المستودع الخاص `ausbildung-automation/hotel-collector-state`، فرع `main` يبدأ بتاريخ الجمع من جميع أوراق Master المتاحة ولقطتي `_Registry` و`Do_Not_Repeat`، إضافة إلى بصمات تاريخ الإرسال. حالة READY غير المرسلة تُحسب أيضاً كمجمعة سابقاً.
+## Discovery and verification
 
-التطابق يعتمد على الاسم والمدينة ورابط المنشأة والإيميل، مع مراجعة دومينات السلاسل والعناوين المشتركة. المطابقات التاريخية أو غير الحاسمة تحفظ منفصلة في `review_candidates` ولا تُحسب فنادق جديدة؛ تبقى قابلة للمراجعة بدل فقدانها. النتائج الجديدة تحفظ بحالة `NEEDS_REVIEW` ولا تدخل طابور الإرسال. السجل يحدّث بعد كل دورة، مع بصمة SHA تمنع الكتابة فوق تحديث متزامن. إذا تعذر الحفظ، يفشل التشغيل؛ لا يستبدل السجل بتاريخ فارغ.
+Six discovery families are supported through a persistent Germany-wide query rotation: employer sites, associations, chambers, hospitality portals, regional training directories, and official employment portals. Existing direct-employer, DEHOGA and Ausbildungskompass adapters remain. A configured `SERPER_API_KEY` enables query discovery; without it, the report explicitly says search is unavailable and existing sources/queued links still run. Search results are URL pointers, never email evidence. JSON-LD job postings and bounded career/contact/ATS links extend discovery without a fixed tiny hotel list.
 
-قد تفوت مطابقة منشأة تغيرت جميع هوياتها. المصدر الأول يغطي دليلاً واحداً؛ توسيع الجمع يحتاج إضافة مصادر رسمية مع محولات مناسبة. هذا النموذج لا يزحف إلى الإنترنت كله ولا يثبت اكتمال التاريخ خارج الملفات المستوردة.
+Hotel training is prioritized across Hotelfach, Hotelmanagement, Restaurants und Veranstaltungsgastronomie, Gastronomie, Koch/Köchin and Fachkraft Küche. A training page without a 2027 date is labeled separately from explicit 2027 evidence.
 
-## إعداد Public
+Only a literal published email from an identified employer page or employer-linked ATS can pass publication. Chain pages require exact-property recipient context. Evidence retains URL, timestamp, identity, scope and recipient role. Configured or third-party emails alone cannot pass. Recruiting addresses outrank general contacts; an existing verified hotel-specific recipient is not downgraded. Verification means publicly sourced and relevant, **not an SMTP deliverability test**. Evidence is refreshed within 90 days.
 
-1. الكود موجود في `ausbildung-automation/hotel-collector-public`. لا ترفع السجل الخاص أو تاريخ مستودعات الإرسال.
-2. سجل البداية الخاص موجود في `ausbildung-automation/hotel-collector-state` على فرع main. ملف الكود العام `config.json` يحدد مكانه فقط.
-3. ضبط Secret باسم `PRIVATE_COLLECTOR_TOKEN`: صلاحية Contents read/write لمستودع `hotel-collector-state` فقط؛ لا صلاحيات إدارة. لا يوضع المفتاح في الكود.
-4. ضبط متغير `COLLECTOR_ENABLED=true` بعد التأكد من الربط. التشغيل المجدول كل 6 ساعات على runner عادي `ubuntu-latest` في المستودع Public نفسه.
-5. لا تعرض سجل الفنادق أو ملفات النتائج في logs أو Artifacts عامة؛ التشغيل يطبع أعداداً فقط. النتائج والتوقفات والطابور محفوظة في المستودع الخاص.
+## State and identity
 
-الحالة: الجمع مفعّل، وأول دورة نجحت في 2026-10-06: 5 مرشحين جدد و87 موجوداً سابقاً أو ذوي تطابق محتمل باستعمال طلبين. النتائج تحتاج مراجعة نوع المنشأة وعرض 2027؛ الدليل قد يحتوي بيت شباب أو مطعماً.
+Private `state/collection_registry.json` keeps all legacy fields and adds `entities`, `aliases`, `human_fields`, `historical_entities`, `discovery_queue`, `discovery_visited`, search cursor, evidence and per-hotel retry schedules. `_Registry` and `Do_Not_Repeat` are refreshed read-only each cycle; the existing 21,138 historical keys and delivery-history provenance remain intact. Counts of keys are not hotel counts.
 
-## عرض النتائج في Master
+One physical location has one canonical ID. Legal-name variants require corroborating city/domain/address/property signals. Conflicting known locations block merges. Generic names require a street/location URL. Shared email, brand or domain alone never merges locations. Ambiguities stay private. Old IDs remain aliases. All old rows and human decisions/notes are archived privately before any projection change, including historical matches and missing-email rows.
 
-تم إنشاء تبويبين في Master الأصلي: `COLLECTOR_NEW` و`COLLECTOR_DUPLICATE_REVIEW`، مع نقل نتائج الدورة الأولى. بقية التبويبات القديمة لا تدخل نطاق المزامنة.
+`COLLECTOR_NEW` is the only results tab. It contains verified, nonhistorical candidates with an email and training evidence. Unresolved hotels remain private with exponential retry delays, rather than being deleted. The first strict migration can reduce the visible count substantially while verification catches up; no throughput promise is made before measuring runs.
 
-`sync_master.py` مربوط مباشرة بملف Master المحدد داخل Workflow. لا يحتاج `GOOGLE_SHEETS_ID` ولا `MASTER_SYNC_ENABLED`.
+The Sheet is updated with one atomic batch, not clear-then-rewrite. Human fields are preserved by ID and aliases; conflicting decisions stop the write. A fresh read detects intervening human edits. Sheets offers no compare-and-swap transaction, so avoid editing during the brief final projection write. Other tabs are read-only. A failed sync never rolls back the private checkpoint.
 
-1. إنشاء حساب خدمة Google مع تفعيل Sheets API، دون صلاحيات إدارة، ومشاركة **ملف Master فقط** مع إيميل حساب الخدمة كمحرر.
-2. حفظ JSON الخاص بالحساب في Secret `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` في المستودع؛ لا يوضع في الكود أو المحادثة.
-3. عند وجود الـSecret، يتحقق Workflow أولاً من الوصول والعناوين وعدد الأعمدة، ثم ينفذ `sync_master.py` تلقائياً. عند غياب الـSecret يستمر الجمع بأمان ولا يحاول الكتابة إلى Google.
-4. آخر فحص بتاريخ 2026-10-06 أكد أن الكود والإكسيل متطابقان، لكن الـSecret غير موجود بعد (`MASTER_LINK_SKIPPED_NO_SERVICE_ACCOUNT`).
+## Validation and rollback
 
-المزامنة لا تعرض عمود المدينة في Master؛ تبقى المدينة داخل السجل الخاص فقط للمساعدة في منع التكرار. جميع عناوين العرض والحالات والمعلومات في تبويبي الجمع باللغة الإنجليزية فقط. المزامنة تحدّث A:H في الصفوف الموجودة حسب المعرّف الثابت K. العمودان I (Review decision) وJ (Your notes) لا يُستبدلان. لا تحذف المعرّفات ولا تغيّر العناوين، ولا ترتّب الصفوف أثناء المزامنة. الكتابة RAW تمنع تنفيذ المحتوى كصيغ. فشل Google لا يلغي السجل الخاص. النتائج والمفاتيح لا تظهر في logs العامة.
+Run `python -m unittest discover -s tests` and `python -m py_compile *.py`.
 
-## اختبار محلي
+Production: `python production.py`. Compatibility: `python collector.py --remote --persist`. Sync only: `python sync_master.py`.
 
-```sh
-python -m unittest discover -s tests
-```
+Rollback refs in both repositories: `rollback/pre-production-upgrade-20261007`. The original state sections are preserved for recovery. Do not revert only the code and let the old sync run against new live state without restoring a consistent private checkpoint and Sheet snapshot.
 
-الاختبارات دون طلبات مواقع. التشغيل الحقيقي يحتاج السجل الخاص المهيأ:
-
-```sh
-python collector.py --remote --persist
-```
-
-الفشل يعطي رسالة عامة لا تسرب العناوين أو المفتاح. لا تستخدم سجل التاريخ الخاص كملف داخل المستودع العام.
+Logs contain aggregate requests/hosts/source families/leads/new identities/suppressed duplicates/verification attempts/verified emails/pending/published/explicit-2027/duration/error categories only. Private data must never be committed to this public repository or uploaded as public Actions artifacts.

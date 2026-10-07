@@ -49,10 +49,11 @@ class Tests(unittest.TestCase):
         p = DirectoryParser(); p.feed('<h3>Hotel Email</h3><p>Hotelfachmann jobs@email.example</p>')
         self.assertEqual(len(list(p.leads(URL))), 1)
 
-    def test_direct_source_requires_expected_text_and_uses_curated_email(self):
+    def test_direct_source_requires_expected_text_and_never_accepts_config_only_email(self):
         source = {'url': URL, 'adapter': 'single_opportunity', 'name': 'Hotel Direct', 'required_phrases': ['Hotelfachmann', '2027'], 'emails': ['jobs@direct.example']}
         found = list(direct_leads(source, '<html><body>Ausbildung Hotelfachmann Start 2027 unrelated@header.example</body></html>'))
-        self.assertEqual(found[0]['emails'], ['jobs@direct.example'])
+        self.assertEqual(found[0]['emails'], ['unrelated@header.example'])
+        self.assertNotIn('jobs@direct.example', found[0]['emails'])
         with self.assertRaisesRegex(SourceError, 'REQUIRED_TEXT_MISSING'):
             list(direct_leads(source, '<html><body>Hotelfachmann</body></html>'))
 
