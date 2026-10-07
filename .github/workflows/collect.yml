@@ -10,7 +10,7 @@ permissions:
   contents: read
 concurrency:
   group: hotel-collection-private-state
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   collect:
     if: vars.COLLECTOR_ENABLED == 'true'
