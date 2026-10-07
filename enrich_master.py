@@ -296,8 +296,10 @@ def save_state(gh,state,sha):
 def run(args):
     info=json.loads(os.environ["GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON"]);sheet=Sheets(os.environ["GOOGLE_SHEETS_ID"],info)
     gh,state,state_sha=load_state();rows=load_rows(sheet,args.sheets);recips=recipient_map(sheet,rows)
-    candidates=[r for r in rows if priority(r)>0 and (args.include_finalized or not finalized(r.status))];candidates.sort(key=priority,reverse=True)
-    fetcher=Fetcher(args.timeout,args.delay,args.max_requests_per_host);search=Serper(os.environ.get("SERPER_API_KEY",""),args.timeout)
+    search_key=os.environ.get("SERPER_API_KEY","").strip()
+    candidates=[r for r in rows if priority(r)>0 and (args.include_finalized or not finalized(r.status)) and (search_key or r.website or r.email or r.offer)]
+    candidates.sort(key=priority,reverse=True)
+    fetcher=Fetcher(args.timeout,args.delay,args.max_requests_per_host);search=Serper(search_key,args.timeout)
     changes=[];processed=changed_rows=changed_cells=0;started=time.time()
     for r in candidates:
         if processed>=args.max_rows or time.time()-started>=args.max_seconds:break
