@@ -1,8 +1,8 @@
 name: Courteous Hotel Collection
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '47 */3 * * *'
+  repository_dispatch:
+    types: [external-cron]
 permissions:
   contents: read
 concurrency:
