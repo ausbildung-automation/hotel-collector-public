@@ -122,6 +122,24 @@ class SyncTests(unittest.TestCase):
                 return [HEADERS] if self.n==1 else [HEADERS,['changed']]
             def req(self,*a):raise AssertionError('must not write')
         with self.assertRaisesRegex(ValueError,'concurrently'):sync(Sheet(),s,lambda:None)
+    def test_visible_historical_row_is_still_reverified(self):
+        s=blank();r=hotel();r['was_visible']=True;upsert(s,r)
+        s['historical_entities']=[dict(hotel(),history_id='old')]
+        calls=[]
+        def fake_enrich(record,state,client,search,report,config):
+            calls.append(record['name']);record['retry_after']=NOW+3600
+        c=CourteousHTTP(s,[],max_requests=10,clock=lambda:NOW,check_dns=False)
+        with patch.dict('os.environ',{'SERPER_API_KEY':''}), patch('production.enrich',fake_enrich):
+            run_cycle(s,{'sources':[]},c)
+        self.assertEqual(calls,['Hotel Alpenblick'])
+        self.assertEqual(s['entities']['a']['historical_match'],'old')
+
+    def test_new_historical_duplicate_is_never_published(self):
+        s=blank();r=verified();upsert(s,r);s['entities']['a']['historical_match']='old'
+        self.assertEqual(rows_for(s,[HEADERS]),[])
+        s['entities']['a']['was_visible']=True
+        self.assertEqual(len(rows_for(s,[HEADERS])),1)
+
     def test_runtime_checkpoint_keeps_unresolved(self):
         s=blank();s['records']['a']=hotel();c=CourteousHTTP(s,[],deadline=0,clock=lambda:NOW,check_dns=False);calls=[]
         with patch.dict('os.environ',{'SERPER_API_KEY':''}):report=run_cycle(s,{'sources':[]},c,lambda:calls.append(1))

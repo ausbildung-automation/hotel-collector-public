@@ -97,6 +97,10 @@ def check_history(state,record):
     elif kinds & {'e:','p:'} and not record.get('city'):
         record['history_risk']='shared_recipient_without_location'
 
+def history_blocked(record):
+    """Historical matches stay suppressed unless this exact entity was already visible before migration."""
+    return bool(record.get('historical_match')) and not bool(record.get('was_visible'))
+
 def adopt(state,lead,report):
     cid,new=upsert(state,lead)
     record=state['entities'][cid]
@@ -200,7 +204,7 @@ def run_cycle(state,config,client,checkpoint=lambda:None):
     # Reclassify legacy weak domain matches using the refreshed, location-aware history.
     for r in state['entities'].values():check_history(state,r)
     def due():
-        return sorted((r for r in state['entities'].values() if not r.get('historical_match') and r.get('retry_after',0)<=client.clock()),
+        return sorted((r for r in state['entities'].values() if not history_blocked(r) and r.get('retry_after',0)<=client.clock()),
                       key=lambda r:(-quality(r),r.get('last_attempt',0),r.get('first_seen',0)))
     # Reserve meaningful discovery capacity, while spending most requests on verification.
     enrichment_ceiling=initial+int(client.max_requests*.55)
@@ -259,10 +263,10 @@ def run_cycle(state,config,client,checkpoint=lambda:None):
         if client.requests>=client.max_requests or (client.deadline and client.clock()+35>=client.deadline):break
         enrich(record,state,client,search,report,config);checkpoint()
     report['requests']=client.requests;report['hosts']=len(client.host_requests)
-    report['published']=sum(publishable(r,client.clock()) for r in state['entities'].values())
-    report['pending']=sum(not publishable(r,client.clock()) and not r.get('historical_match') for r in state['entities'].values())
-    report['historical_suppressed']=sum(bool(r.get('historical_match')) for r in state['entities'].values())
-    report['explicit_2027']=sum(publishable(r,client.clock()) and any(e['status']=='EXPLICIT_2027' for e in r.get('training_evidence',[])) for r in state['entities'].values())
+    report['published']=sum(publishable(r,client.clock()) and not history_blocked(r) for r in state['entities'].values())
+    report['pending']=sum(not publishable(r,client.clock()) and not history_blocked(r) for r in state['entities'].values())
+    report['historical_suppressed']=sum(history_blocked(r) for r in state['entities'].values())
+    report['explicit_2027']=sum(publishable(r,client.clock()) and not history_blocked(r) and any(e['status']=='EXPLICIT_2027' for e in r.get('training_evidence',[])) for r in state['entities'].values())
     report['families_attempted']=sorted(set(report['families_attempted']))
     report['duration_seconds']=round(client.clock()-started,1)
     state['last_report']=report;state['last_run_at']=client.clock();checkpoint()
@@ -276,7 +280,7 @@ def rows_for(state,existing):
     positions={r[10]:i for i,r in enumerate(existing[1:]) if len(r)>10}
     records=state['entities'].items()
     for cid,r in sorted(records,key=lambda item:min([positions.get(a,10**9) for a in item[1].get('aliases',[item[0]])] or [10**9])):
-        if not publishable(r):continue
+        if history_blocked(r) or not publishable(r):continue
         ev=best_email(r);decisions=[];notes=[]
         for a in r.get('aliases',[cid]):
             human=humans.get(a,{})
