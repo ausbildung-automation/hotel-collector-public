@@ -1,10 +1,6 @@
 name: Continuous COLLECTOR_NEW Enricher
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/enrich-master.yml'
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -61,7 +57,7 @@ jobs:
         shell: bash
         run: |
           mode=""
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "repository_dispatch" ] || [ "${{ inputs.apply }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "repository_dispatch" ] || [ "${{ inputs.apply }}" = "true" ]; then
             mode="--apply"
           fi
           python enrich_master.py --sheets COLLECTOR_NEW $mode
