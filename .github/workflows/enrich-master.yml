@@ -1,15 +1,16 @@
-name: Continuous Master Enricher
+name: Continuous COLLECTOR_NEW Enricher
 
 on:
   push:
     branches: [main]
     paths:
-      - 'enrich_master.py'
       - '.github/workflows/enrich-master.yml'
+  schedule:
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       apply:
-        description: 'Write verified improvements to the Master Sheet'
+        description: 'Write verified improvements to COLLECTOR_NEW'
         required: false
         default: false
         type: boolean
@@ -20,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hotel-master-enricher
+  group: hotel-collector-new-enricher
   cancel-in-progress: false
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
       GOOGLE_SHEETS_ID: 1qBViUSJvnnkagG_2XPlxSgeHQOJA4MDm0_gFKitrxcI
       GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON }}
       SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
-      ENRICH_MAX_ROWS: '20'
+      ENRICH_MAX_ROWS: '15'
       ENRICH_MAX_SECONDS: '900'
       ENRICH_MAX_PAGES: '7'
       ENRICH_MAX_HOST_REQUESTS: '5'
@@ -56,11 +57,11 @@ jobs:
       - name: Verify Master link before enrichment
         run: python check_master_link.py
 
-      - name: Enrich Master
+      - name: Enrich COLLECTOR_NEW only
         shell: bash
         run: |
           mode=""
-          if [ "${{ github.event_name }}" = "repository_dispatch" ] || [ "${{ inputs.apply }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "repository_dispatch" ] || [ "${{ inputs.apply }}" = "true" ]; then
             mode="--apply"
           fi
-          python enrich_master.py $mode
+          python enrich_master.py --sheets COLLECTOR_NEW $mode
