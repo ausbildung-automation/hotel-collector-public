@@ -13,7 +13,7 @@ FINAL=("packaged","queued","sent","rejected","duplicate","do not repeat")
 CAREER=("ausbildung","azubi","karriere","career","jobs","stellen","bewerbung","hotelfach","gastgewerbe","auszubild")
 CONTACT=("kontakt","contact","impressum","personal","hr","recruiting")
 HOTEL_TRAINING=("hotelfachmann","hotelfachfrau","hotelfachleute","hotelfachkraft")
-EMAIL_PRIORITY=[("ausbildung",100),("azubi",98),("personal",94),("hr",92),("humanresources",92),("bewerbung",90),("recruit",88),("karriere",86),("career",86),("jobs",82),("info",55),("kontakt",52),("contact",50),("rezeption",35),("reservation",20)]
+EMAIL_PRIORITY=[("ausbildung",100),("azubi",98),("talent",96),("personal",94),("hr",92),("humanresources",92),("bewerbung",90),("recruit",88),("karriere",86),("career",86),("jobs",82),("info",55),("kontakt",52),("contact",50),("rezeption",35),("reservation",20)]
 BAD_LOCALS={"noreply","no-reply","donotreply","do-not-reply","privacy","datenschutz","abuse","webmaster"}
 BLOCKED={"facebook.com","instagram.com","linkedin.com","youtube.com","tiktok.com","x.com","twitter.com","booking.com","tripadvisor.com","holidaycheck.de","hrs.de","expedia.de","expedia.com","indeed.com","indeed.de","stepstone.de","meinestadt.de","hotelcareer.de","hogapage.de","arbeitsagentur.de","ausbildung.de","azubiyo.de"}
 GENERIC={"gmail.com","outlook.com","hotmail.com","yahoo.com","gmx.de","web.de"}
@@ -68,13 +68,21 @@ def col_letter(n):
     while n:n,r=divmod(n-1,26);out=chr(65+r)+out
     return out
 
+def email_role_score(email):
+    e=norm(email)
+    if "@" not in e:return -999
+    local=e.rsplit("@",1)[0]
+    if local in BAD_LOCALS:return -500
+    compact=re.sub(r"[^a-z0-9]","",local)
+    return max([pts for token,pts in EMAIL_PRIORITY if token in compact] or [0])
+
 def score_email(email,website=""):
     e=norm(email)
     if "@" not in e:return -999
     local,dom=e.rsplit("@",1)
-    if local in BAD_LOCALS:return -500
-    compact=re.sub(r"[^a-z0-9]","",local)
-    score=max([pts for token,pts in EMAIL_PRIORITY if token in compact] or [65 if "." in local or "-" in local else 45])
+    role=email_role_score(e)
+    if role<0:return role
+    score=role if role else (65 if "." in local or "-" in local else 45)
     if website and same_domain(dom,website):score+=20
     return score
 
@@ -318,9 +326,13 @@ def run(args):
         if not r.website and website_c and "website" in r.cols:
             changes.append({"range":f"'{r.sheet}'!{col_letter(r.cols['website'])}{r.row}","values":[[website_c.value]]});row_changes.append({"field":"website","new":website_c.value,"score":website_c.score});r.website=website_c.value;changed_cells+=1
         if best_e and "email" in r.cols:
-            old=score_email(r.email,working);improve=(not r.email and best_e.score>=55) or (r.email and best_e.score>=old+12)
+            old=score_email(r.email,working);new_role=email_role_score(best_e.value);old_role=email_role_score(r.email) if r.email else 0
+            if not r.email:
+                improve=new_role>=50
+            else:
+                improve=new_role>=80 and new_role>=old_role+8 and best_e.score>=old+8
             owners=recips.get(norm(best_e.value),set());conflict=bool(owners and any(h and h!=norm(r.hotel) for h in owners));domain_ok=not working or same_domain(email_domain(best_e.value),working)
-            if improve and not conflict and (domain_ok or best_e.score>=95):
+            if improve and not conflict and domain_ok:
                 changes.append({"range":f"'{r.sheet}'!{col_letter(r.cols['email'])}{r.row}","values":[[best_e.value]]});row_changes.append({"field":"email","old":r.email,"new":best_e.value,"score":best_e.score});recips[norm(best_e.value)].add(norm(r.hotel));r.email=best_e.value;changed_cells+=1
         if not r.offer and best_o and best_o.score>=85 and "offer" in r.cols:
             changes.append({"range":f"'{r.sheet}'!{col_letter(r.cols['offer'])}{r.row}","values":[[best_o.value]]});row_changes.append({"field":"offer","new":best_o.value,"score":best_o.score});r.offer=best_o.value;changed_cells+=1
