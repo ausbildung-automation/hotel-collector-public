@@ -144,7 +144,7 @@ def best_email(record, now=None):
 def publishable(record, now=None):
     now=time.time() if now is None else now
     training=[e for e in record.get('training_evidence',[]) if e.get('professions') and 0<=now-e.get('verified_at',0)<=90*86400]
-    return bool(best_email(record,now) and training and not record.get('historical_match') and not record.get('history_risk'))
+    return bool(best_email(record,now) and training and (not record.get('historical_match') or record.get('was_visible')) and not record.get('history_risk'))
 
 def quality(record):
     return (40*bool(record.get('training_evidence')) + 30*any(e.get('status')=='EXPLICIT_2027' for e in record.get('training_evidence',[]))
