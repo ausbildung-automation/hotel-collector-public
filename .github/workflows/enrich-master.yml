@@ -1,6 +1,11 @@
 name: Continuous Master Enricher
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'enrich_master.py'
+      - '.github/workflows/enrich-master.yml'
   workflow_dispatch:
     inputs:
       apply:
