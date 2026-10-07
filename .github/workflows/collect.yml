@@ -3,9 +3,6 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [external-cron]
-  push:
-    branches: [main]
-    paths: ['.collector-run-now']
 permissions:
   contents: read
 concurrency:
