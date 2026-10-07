@@ -7,7 +7,7 @@ TAB='COLLECTOR_NEW'
 TABS={'all':TAB}
 HEADERS=['Hotel','Email','Website','Profession','Collection status','Source evidence','Collected UTC','Source','Review decision','Your notes','Stable ID']
 _GENERIC={'hotel','hotels','best','western','plus','spa','resort','gasthof','restaurant','cafe','landhotel','wellnesshotel','parkhotel','kurhotel','zur','zum','der','die','das','am','an','im','in','post'}
-_LEGAL=re.compile(r'\\b(gmbh|co|kg|egbr|ek|mbh|ag|und|and)\\b',re.I)
+_LEGAL=re.compile(r'\b(gmbh|co|kg|egbr|ek|mbh|ag|und|and)\b',re.I)
 
 def _norm_name(v):
     t=unicodedata.normalize('NFKD',str(v or '').casefold())
