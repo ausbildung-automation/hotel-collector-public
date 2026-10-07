@@ -1,0 +1,61 @@
+name: Continuous Master Enricher
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write verified improvements to the Master Sheet'
+        required: false
+        default: false
+        type: boolean
+  repository_dispatch:
+    types: [external-enricher]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hotel-master-enricher
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PRIVATE_COLLECTOR_TOKEN: ${{ secrets.PRIVATE_COLLECTOR_TOKEN }}
+      GOOGLE_SHEETS_ID: 1qBViUSJvnnkagG_2XPlxSgeHQOJA4MDm0_gFKitrxcI
+      GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON }}
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      ENRICH_MAX_ROWS: '20'
+      ENRICH_MAX_SECONDS: '900'
+      ENRICH_MAX_PAGES: '7'
+      ENRICH_MAX_HOST_REQUESTS: '5'
+      ENRICH_DELAY: '1.0'
+      ENRICH_COOLDOWN_HOURS: '168'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate Python syntax
+        run: python -m py_compile enrich_master.py github_state.py
+
+      - name: Install Google Sheets dependency
+        run: python -m pip install 'google-auth[requests]>=2.59.1,<3'
+
+      - name: Verify Master link before enrichment
+        run: python check_master_link.py
+
+      - name: Enrich Master
+        shell: bash
+        run: |
+          mode=""
+          if [ "${{ github.event_name }}" = "repository_dispatch" ] || [ "${{ inputs.apply }}" = "true" ]; then
+            mode="--apply"
+          fi
+          python enrich_master.py $mode
