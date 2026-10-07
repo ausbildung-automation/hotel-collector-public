@@ -178,6 +178,11 @@ def enrich(record,state,client,search,report,config):
 
 def run_cycle(state,config,client,checkpoint=lambda:None):
     canonicalize(state)
+    for record in state['entities'].values():
+        if any(e.get('policy_version')!=4 for e in record.get('email_evidence',[])):
+            record['email_evidence']=[]
+            record['retry_after']=0
+            record['verify_queue']=[{'url':record['website'],'linked_from':''}] if record.get('website') else []
     report={k:0 for k in ('requests','hosts','sources_attempted','raw_leads','new_identities','duplicates_suppressed','enrichment_attempts','emails_verified','pending','published','explicit_2027')}
     report['errors']={};report['families_attempted']=[]
     search=Search(client,state);report['search_enabled']=bool(search.key)

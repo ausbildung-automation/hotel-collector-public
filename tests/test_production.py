@@ -72,6 +72,12 @@ class EvidenceTests(unittest.TestCase):
     def test_another_property_training_not_borrowed(self):
         r=hotel();raw='<h1>Unsere Hotels</h1>Hotel Alpenblick München Kontakt info@alpenblick.example'+(' x'*500)+'Hotel Seeblick Berlin Ausbildung Hotelfachmann'
         verify_page(r,r['website'],raw,NOW);self.assertFalse(publishable(r,NOW))
+    def test_footer_agency_recipient_rejected(self):
+        r=hotel();verify_page(r,r['website'],html('hr@agency.example',extra='<p>Webdesign Agentur</p>'),NOW)
+        self.assertIsNone(best_email(r,NOW))
+    def test_hr_substring_in_person_name_not_hr_role(self):
+        from verification import role
+        self.assertLess(role('christina@hotel.example'),role('hr@hotel.example'))
     def test_identity_mismatch_rejected(self):
         r=hotel('Hotel Seeblick');verify_page(r,r['website'],html(),NOW);self.assertIsNone(best_email(r,NOW))
     def test_email_scope_and_identity_evidence_required(self):

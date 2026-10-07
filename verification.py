@@ -64,7 +64,8 @@ def exact_identity(record, text):
 def role(email):
     local=email.split('@')[0].lower()
     if any(x in local for x in BAD):return -1
-    for words,score in [(('ausbildung','azubi'),100),(('talent','personal','hr','recruit','bewerbung','career','karriere','jobs'),90),(('info','kontakt','contact'),55)]:
+    if re.search(r'(?:^|[._-])hr(?:$|[._-])',local):return 90
+    for words,score in [(('ausbildung','azubi'),100),(('talent','personal','recruit','bewerbung','career','karriere','jobs'),90),(('info','kontakt','contact'),55),(('rezeption','reception'),40),(('reservierung','reservation','booking'),30)]:
         if any(w in local for w in words):return score
     return 60
 
@@ -107,9 +108,15 @@ def verify_page(record, url, raw, now=None, linked_from=''):
         contexts=[text[max(0,m.start()-350):m.end()+350] for m in re.finditer(re.escape(email),text,re.I)]
         chain_ok=any(exact_identity(record,c) and re.search(r'bewerb|ausbildung|personal|recruit|kontakt',c,re.I) for c in contexts)
         if not single and not chain_ok:continue
+        # Footer suppliers are not hotel recipients. Cross-domain addresses require explicit
+        # application/contact context identifying this property, even on a single-hotel page.
+        foreign=not same_site('https://'+email.rsplit('@',1)[1],record.get('website',''))
+        bad_context=any(re.search(r'(?:webdesign|agentur|website by|webmaster|datenschutzbeauftrag)',c,re.I) for c in contexts)
+        application=any(exact_identity(record,c) and re.search(r'bewerb|ausbildung|personal|recruit',c,re.I) for c in contexts)
+        if bad_context or (foreign and not application):continue
         ev={'email':email,'url':url,'source_type':'official_ats' if ats else 'official_employer','hotel_identity':record['collection_id'],
             'verified_at':now,'confidence':'high','scope':'hotel_specific' if single else 'approved_chain_recruiting','role_score':score,
-            'exact_published':True,'location_evidence':True}
+            'exact_published':True,'location_evidence':True,'policy_version':4}
         accepted.append(ev)
     record['email_evidence']=[e for e in record.get('email_evidence',[]) if e.get('url')!=url and now-e.get('verified_at',0)<=90*86400]
     known=record['email_evidence']
@@ -122,7 +129,7 @@ def verify_page(record, url, raw, now=None, linked_from=''):
 def best_email(record, now=None):
     now=time.time() if now is None else now
     aliases=set(record.get('aliases',[])+[record.get('collection_id')])
-    valid=[e for e in record.get('email_evidence',[]) if e.get('exact_published') is True and EMAIL.fullmatch(e.get('email',''))
+    valid=[e for e in record.get('email_evidence',[]) if e.get('policy_version')==4 and e.get('exact_published') is True and EMAIL.fullmatch(e.get('email',''))
            and e.get('source_type') in ('official_employer','official_ats') and e.get('hotel_identity') in aliases and e.get('location_evidence')
            and e.get('url','').startswith('https://') and 0<=now-e.get('verified_at',0)<=90*86400 and role(e['email'])>=0]
     if not valid:return None
