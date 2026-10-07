@@ -1,2 +1,2 @@
-run-now 2026-10-07T16:50:30Z
-reason: production validation after historical-visibility fix
+run-now 2026-10-07T16:52:00Z
+reason: replace stale production run with corrected validated collector
